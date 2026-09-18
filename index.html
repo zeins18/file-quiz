@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kuis Interaktif Multimedia</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .container { background-color: white; width: 100%; max-width: 800px; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { font-size: 24px; color: #333; margin-bottom: 5px; text-align: center; }
+        .info-bar { display: flex; justify-content: space-between; color: #666; font-size: 14px; margin-bottom: 20px; font-weight: bold; }
+        #question-text { font-size: 18px; color: #111; margin-bottom: 20px; font-weight: bold; line-height: 1.4; text-align: center;}
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 5px; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        .btn { display: block; width: 100%; padding: 12px; margin-top: 20px; background-color: #0866ff; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; text-align: center; }
+        .btn:hover { background-color: #0054d6; }
+        .btn:disabled { background-color: #ccc; cursor: not-allowed; }
+        .option-btn { display: block; width: 100%; padding: 15px; margin: 10px 0; background-color: #e4e6eb; border: 2px solid transparent; border-radius: 8px; cursor: pointer; font-size: 16px; transition: 0.2s; text-align: left; line-height: 1.3; }
+        .option-btn:hover { background-color: #d8dadf; }
+        .option-btn:disabled { cursor: not-allowed; }
+        .correct { background-color: #d4edda !important; border-color: #28a745 !important; color: #155724; }
+        .wrong { background-color: #f8d7da !important; border-color: #dc3545 !important; color: #721c24; }
+        #feedback { font-size: 18px; font-weight: bold; margin: 15px 0; height: 25px; text-align: center; }
+        .final-score { font-size: 40px; color: #0866ff; margin: 10px 0; text-align: center; }
+        .text-center { text-align: center; }
+        .table-responsive { overflow-x: auto; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; font-size: 14px; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+        .row-correct { background-color: #f0fdf4; }
+        .row-wrong { background-color: #fef2f2; }
+        #quiz-container, #result-container { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="login-container">
+    <h1>Selamat Datang di Kuis Multimedia</h1>
+    <p class="text-center">Silakan isi data diri Anda sebelum memulai.</p>
+    <div class="form-group"><label>Nama Lengkap</label><input type="text" id="nama" required></div>
+    <div class="form-group"><label>E-mail</label><input type="email" id="email" required></div>
+    <div class="form-group"><label>Kelas</label><input type="text" id="kelas" required></div>
+    <button class="btn" onclick="startQuiz()">Mulai Kuis</button>
+</div>
+
+<div class="container" id="quiz-container">
+    <h1>Kuis Multimedia & Video Editing</h1>
+    <div class="info-bar"><span id="question-counter">Soal: 1/30</span><span id="peserta-info">Peserta</span></div>
+    <div id="question-text">Memuat...</div>
+    <div id="options-container"></div>
+    <div id="feedback"></div>
+    <button class="btn" id="next-btn" style="display:none;" onclick="nextQuestion()">Selanjutnya (Tekan Enter)</button>
+</div>
+
+<div class="container" id="result-container">
+    <h1>Kuis Selesai!</h1>
+    <p class="text-center">Nilai Akhir Anda:</p>
+    <div class="final-score" id="final-score-text">100</div>
+    
+    <h3>Rekapitulasi Jawaban</h3>
+    <div class="table-responsive">
+        <table id="rekap-table">
+            <thead><tr><th>No</th><th>Pertanyaan</th><th>Jawaban Anda</th><th>Kunci Jawaban</th><th>Status</th></tr></thead>
+            <tbody id="rekap-body"></tbody>
+        </table>
+    </div>
+
+    <button class="btn" id="submit-server-btn" onclick="sendDataToServer()" style="background-color: #28a745; margin-top: 20px;">Kirim Nilai ke Guru</button>
+    <p class="text-center" id="server-status" style="margin-top: 10px; font-weight: bold;"></p>
+
+    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(submitted){ document.getElementById('server-status').innerText = '✅ Nilai berhasil dikirim ke guru!'; document.getElementById('server-status').style.color = '#28a745'; document.getElementById('submit-server-btn').innerText = 'Terkirim'; }"></iframe>
+    <form action="" method="GET" target="hidden_iframe" id="server-form" style="display:none;">
+        <input type="text" name="waktu" id="f-waktu">
+        <input type="text" name="nama" id="f-nama">
+        <input type="text" name="email" id="f-email">
+        <input type="text" name="kelas" id="f-kelas">
+        <input type="text" name="skor" id="f-skor">
+    </form>
+</div>
+
+<script>
+    const SERVER_URL = "https://script.google.com/macros/s/AKfycbwUQryeXVSf1K2tk3YXUri2c-bcszftWM5aHLc1dfqsm8wvPHgm7-T45GJhzyXoeGYj0w/exec";
+
+    // ==========================================
+    // PENGATURAN FILE MP3 LOKAL
+    // Silakan ganti nama file di dalam tanda kutip 
+    // dengan nama file MP3 yang ada di folder Anda.
+    // ==========================================
+    const audioBenar = [
+        "benar1.mp3", // Ganti dengan nama file MP3 benar pertama Anda
+        "benar2.mp3", // Ganti dengan nama file MP3 benar kedua Anda
+        "benar3.mp3"  // Ganti dengan nama file MP3 benar ketiga Anda
+    ];
+    
+    const audioSalah = [
+        "salah1.mp3", // Ganti dengan nama file MP3 salah pertama Anda
+        "salah2.mp3", // Ganti dengan nama file MP3 salah kedua Anda
+        "salah3.mp3"  // Ganti dengan nama file MP3 salah ketiga Anda
+    ];
+
+    const audioSkorTinggi = [
+        "tinggi1.mp3", // Ganti dengan nama file MP3 skor > 80 pertama
+        "tinggi2.mp3"  // Ganti dengan nama file MP3 skor > 80 kedua
+    ];
+
+    const audioSkorRendah = [
+        "rendah1.mp3", // Ganti dengan nama file MP3 skor < 60 pertama
+        "rendah2.mp3"  // Ganti dengan nama file MP3 skor < 60 kedua
+    ];
+
+    // Fungsi untuk memutar file MP3 secara acak
+    function playMp3Random(audioArray) {
+        if (audioArray.length === 0) return;
+        const randomIndex = Math.floor(Math.random() * audioArray.length);
+        const audioFile = audioArray[randomIndex];
+        
+        const sound = new Audio(audioFile);
+        sound.play().catch(err => {
+            console.log("Gagal memutar audio. Pastikan file MP3 ada di folder yang sama:", audioFile);
+        });
+    }
+
+    const originalQuestions = [
+        { question: "Salah satu cara efektif untuk mencegah kelelahan mata akibat bekerja di depan layar komputer adalah ...", options: ["Menggunakan layar dengan resolusi tinggi", "Mengikuti aturan 20-20-20 (setiap 20 menit, melihat sesuatu yang berjarak 20 kaki selama 20 detik)", "Menggunakan kacamata hitam.", "Mengurangi kecerahan layar sampai titik terendah."], answer: "Mengikuti aturan 20-20-20 (setiap 20 menit, melihat sesuatu yang berjarak 20 kaki selama 20 detik)" },
+        { question: "Bagaimana cara terbaik untuk mengurangi risiko gangguan pendengaran di lingkungan kerja multimedia yang bising?", options: ["Menggunakan peredam suara dan earplug", "Menambah jumlah monitor di tempat kerja", "Menggunakan lampu yang lebih terang", "Mengatur posisi duduk lebih dekat dengan sumber suara"], answer: "Menggunakan peredam suara dan earplug" },
+        { question: "Strategi mana yang paling efektif untuk mengurangi kelelahan mata akibat bekerja terlalu lama di depan layar komputer?", options: ["Menggunakan layar berukuran besar", "Mengatur pencahayaan ruangan yang cukup dan tidak silau", "Menyediakan camilan di meja kerja", "Memakai headphone untuk mendengarkan musik"], answer: "Mengatur pencahayaan ruangan yang cukup dan tidak silau" },
+        { question: "Apa yang bisa dilakukan untuk mengurangi risiko cedera ergonomis bagi pekerja multimedia yang banyak bekerja di depan komputer?", options: ["Menggunakan meja dan kursi yang dapat diatur ketinggiannya", "Menggunakan monitor tambahan untuk multitasking", "Menggunakan headset untuk komunikasi", "Menggunakan layar dengan resolusi tinggi"], answer: "Menggunakan meja dan kursi yang dapat diatur ketinggiannya" },
+        { question: "Dalam video editing, apa tujuan utama dari koreksi warna (color correction)?", options: ["Menambahkan teks ke video", "Meningkatkan kualitas audio", "Menyesuaikan dan memperbaiki warna untuk tampilan yang konsisten dan natural", "Mengurangi ukuran file video"], answer: "Menyesuaikan dan memperbaiki warna untuk tampilan yang konsisten dan natural" },
+        { question: "Apa resolusi standar untuk video Full HD?", options: ["1280 x 720", "1920 x 1080", "2560 x 1440", "3840 x 2160"], answer: "1920 x 1080" },
+        { question: "Transisi manakah yang paling sederhana dan umum digunakan dalam video editing?", options: ["Fade to black", "Zoom in", "Spin transition", "Wipe"], answer: "Fade to black" },
+        { question: "Apa yang dimaksud dengan teknik \"cutting on action\" dalam video editing?", options: ["Memotong klip video berdasarkan audio", "Memotong klip video pada saat terjadi gerakan untuk menciptakan transisi yang mulus", "Menambahkan efek khusus pada adegan aksl", "Menggabungkan beberapa klip video menjadi satu"], answer: "Memotong klip video pada saat terjadi gerakan untuk menciptakan transisi yang mulus" },
+        { question: "Software berikut manakah yang paling sering digunakan untuk video editing profesional?", options: ["Microsoft PowerPoint", "Adobe Premiere Pro", "Adobe Vedio editing Pro", "Adobe Photoshop"], answer: "Adobe Premiere Pro" },
+        { question: "Apa yang dimaksud dengan creative brief dalam video editing?", options: ["Dokumen yang berisi panduan teknis tentang software editing.", "Dokumen yang merinci konsep kreatif dan arahan untuk proyek video.", "Daftar semua klip video yang akan digunakan.", "Panduan penggunaan kamera untuk pengambilan gambar."], answer: "Dokumen yang merinci konsep kreatif dan arahan untuk proyek video." },
+        { question: "Elemen berikut manakah yang biasanya termasuk dalam sebuah creative brief untuk proyek video?", options: ["Tujuan proyek, target audiens, pesan utama", "Daftar harga software editing", "Manual penggunaan kamera", "Daftar lagu untuk soundtrack"], answer: "Tujuan proyek, target audiens, pesan utama" },
+        { question: "Mengapa penting untuk mencantumkan tujuan proyek dalam creative brief?", options: ["Untuk menentukan anggaran produksi", "Untuk mengarahkan proses pengeditan agar sesuai dengan hasil yang diinginkan", "Untuk memilih software editing yang tepat", "Untuk menentukan lokasi syuting"], answer: "Untuk mengarahkan proses pengeditan agar sesuai dengan hasil yang diinginkan" },
+        { question: "Bagaimana deskripsi target audiens dalam creative brief dapat mempengaruhi proses editing video?", options: ["Menentukan format file akhir.", "Memilih efek visual yang sesuai dengan preferensi audiens.", "Menentukan jenis kamera yang digunakan", "Menentukan lokasi pengambilan gambar"], answer: "Memilih efek visual yang sesuai dengan preferensi audiens." },
+        { question: "Apa fungsi utama dari memasukkan pesan utama dalam creative brief untuk proyek video?", options: ["Memastikan konsistensi pesan yang ingin disampaikan kepada audiens", "Mengatur jadwal syuting", "Memilih perangkat keras yang digunakan untuk pengeditan", "Mengurangi ukuran file video akhir"], answer: "Memastikan konsistensi pesan yang ingin disampaikan kepada audiens" },
+        { question: "Apa yang dimaksud dengan technical brief dalam video editing?", options: ["Dokumen yang berisi panduan kreatif dan konsep proyek video.", "Dokumen yang merinci aspek teknis dan spesifikasi untuk proyek video.", "Daftar semua klip video yang akan digunakan.", "Panduan penggunaan kamera untuk pengambilan gambar."], answer: "Dokumen yang merinci aspek teknis dan spesifikasi untuk proyek video." },
+        { question: "Elemen berikut manakah yang biasanya termasuk dalam sebuah technical brief untuk proyek video?", options: ["Pesan utama, target audiens, tujuan proyek", "Resolusi video, format file, frame rate", "Daftar harga software editing", "Manual penggunaan kamera"], answer: "Resolusi video, format file, frame rate" },
+        { question: "Mengapa penting untuk mencantumkan resolusi video dalam technical brief?", options: ["Untuk menentukan anggaran produksi", "Untuk memastikan video memiliki kualitas gambar yang diinginkan", "Untuk memilih software editing yang tepat", "Untuk menentukan lokasi syuting"], answer: "Untuk memastikan video memiliki kualitas gambar yang diinginkan" },
+        { question: "Bagaimana pemilihan format file dalam technical brief mempengaruhi proses editing video?", options: ["Menentukan jenis kamera yang digunakan", "Memastikan kompatibilitas dengan software editing dan platform distribusi", "Menentukan jadwal syuting", "Menentukan efek visual yang digunakan"], answer: "Memastikan kompatibilitas dengan software editing dan platform distribusi" },
+        { question: "Apa fungsi utama dari mencantumkan frame rate dalam technical brief untuk proyek video?", options: ["Memastikan konsistensi visual dan kesesuaian dengan standar penyiaran atau platform online", "Mengatur jadwal syuting", "Memilih perangkat keras yang digunakan untuk pengeditan", "Mengurangi ukuran file video akhir"], answer: "Memastikan konsistensi visual dan kesesuaian dengan standar penyiaran atau platform online" },
+        { question: "Apa saja elemen utama yang biasanya terdapat dalam struktur naskah video?", options: ["Judul, dialog, deskripsi adegan, dan petunjuk visual", "Daftar lagu, kamera, dan lokasi", "Daftar produk, harga, dan deskripsi", "Tanggal syuting, anggaran, dan pengeditan"], answer: "Judul, dialog, deskripsi adegan, dan petunjuk visual" },
+        { question: "Mengapa penting untuk memiliki naskah yang terperinci sebelum memulai proses editing video?", options: ["Untuk menentukan anggaran produksi", "Untuk memastikan alur cerita, konsistensi pesan, dan penggunaan sumber daya yang efisien", "Untuk memilih efek visual yang digunakan", "Untuk mengatur jadwal syuting"], answer: "Untuk memastikan alur cerita, konsistensi pesan, dan penggunaan sumber daya yang efisien" },
+        { question: "Dalam naskah video, bagaimana cara menulis dialog yang efektif?", options: ["Menggunakan bahasa formal dan panjang.", "Menulis dialog secara natural dan sesuai dengan karakter.", "Menggunakan bahasa teknis dan jargon.", "Menulis dialog secara acak tanpa mengikuti alur cerita."], answer: "Menulis dialog secara natural dan sesuai dengan karakter." },
+        { question: "Apa tujuan dari deskripsi adegan dalam naskah video?", options: ["Untuk mengatur jadwal syuting", "Untuk memberikan panduan visual dan konteks kepada tim produksi", "Untuk menentukan efek suara", "Untuk memilih lokasi syuting."], answer: "Untuk memberikan panduan visual dan konteks kepada tim produksi" },
+        { question: "Mengapa revisi naskah merupakan bagian penting dari proses pembuatan video?", options: ["Untuk memastikan bahwa naskah sesuai dengan visi kreatif dan kebutuhan produksi", "Untuk memilih perangkat keras yang digunakan untuk pengeditan", "Untuk menentukan anggaran produksi", "Untuk mengurangi ukuran file video akhir"], answer: "Untuk memastikan bahwa naskah sesuai dengan visi kreatif dan kebutuhan produksi" },
+        { question: "Apa software yang digunakan untuk video editing?", options: ["Microsoft Word", "Corel Draw", "Adobe Premier Pro", "Spotify"], answer: "Adobe Premiere Pro" },
+        { question: "Export dalam proses editing video digunakan untuk?", options: ["Menambahkan unsur penunjang audio pada bagian akhir video", "Menyimpan project ke dalam format video yang diinginkan", "Membuat layer baru dalam tampilan utama", "Menutup project menuju beranda utama"], answer: "Menyimpan project ke dalam format video yang diinginkan" },
+        { question: "Apa yang dimaksud dengan color grading dalam editing video?", options: ["Proses untuk menciptakan warna baru dalam palet warna", "Proses untuk blocking warna dari sebuah tayangan", "Proses untuk menambahkan layer pada tabel warna", "Proses untuk mengubah tone visual dari sebuah tayangan"], answer: "Proses untuk mengubah tone visual dari sebuah tayangan" },
+        { question: "Apa tujuan penggunaan reverse video pada proses pengeditan?", options: ["Untuk menampilkan video putar balik", "Untuk menampilkan video kecerahan maksimal", "Untuk menampilkan video dengan kesan retro", "Untuk menampilkan video dengan komposisi default"], answer: "Untuk menampilkan video putar balik" },
+        { question: "Dalam pengambilan video, green screen digunakan untuk?", options: ["Menyimpan file video dengan efek tertentu", "Mempermudah proses penggantian latar belakang saat editing", "Memotong bagian awal tayangan video", "Menambahkan efek transisi dan time remapping"], answer: "Mempermudah proses penggantian latar belakang saat editing" },
+        { question: "Apa yang dimaksud dengan rendering?", options: ["Proses pemisahan video utuh menjadi 3 bagian", "Proses pemisahan video utuh menjadi 2 bagian", "Proses penggabungan beberapa objek menjadi video yang utuh", "Proses penggabungan video utuh dari project lain"], answer: "Proses penggabungan beberapa objek menjadi video yang utuh" }
+    ];
+
+    let currentQuestions = [];
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let userData = { nama: "", email: "", kelas: "" };
+    let rekapJawaban = [];
+    let submitted = false;
+
+    function shuffleArray(array) {
+        let shuffled = array.slice();
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+
+    function startQuiz() {
+        const inputNama = document.getElementById('nama').value.trim();
+        const inputEmail = document.getElementById('email').value.trim();
+        const inputKelas = document.getElementById('kelas').value.trim();
+
+        if (!inputNama || !inputEmail || !inputKelas) { alert("Harap isi semua data!"); return; }
+
+        userData = { nama: inputNama, email: inputEmail, kelas: inputKelas };
+        document.getElementById('peserta-info').innerText = `${userData.nama} (${userData.kelas})`;
+
+        document.getElementById('login-container').style.display = 'none';
+        document.getElementById('quiz-container').style.display = 'block';
+
+        currentQuestions = shuffleArray(originalQuestions);
+        currentQuestionIndex = 0; score = 0; rekapJawaban = [];
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        const qData = currentQuestions[currentQuestionIndex];
+        document.getElementById('question-counter').innerText = `Soal: ${currentQuestionIndex + 1} / ${currentQuestions.length}`;
+        document.getElementById('question-text').innerText = qData.question;
+        
+        const optionsContainer = document.getElementById('options-container');
+        optionsContainer.innerHTML = '';
+        document.getElementById('feedback').innerText = '';
+        document.getElementById('next-btn').style.display = 'none';
+
+        const shuffledOptions = shuffleArray(qData.options);
+        shuffledOptions.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn'; btn.innerText = opt;
+            btn.onclick = () => checkAnswer(btn, opt, qData.answer);
+            optionsContainer.appendChild(btn);
+        });
+    }
+
+    function checkAnswer(selectedBtn, selectedAnswer, correctAnswer) {
+        const buttons = document.querySelectorAll('.option-btn');
+        buttons.forEach(btn => btn.disabled = true);
+        const isCorrect = (selectedAnswer === correctAnswer);
+
+        rekapJawaban.push({
+            pertanyaan: currentQuestions[currentQuestionIndex].question,
+            jawabanUser: selectedAnswer, kunciJawaban: correctAnswer,
+            status: isCorrect ? 'Benar' : 'Salah'
+        });
+
+        if (isCorrect) {
+            selectedBtn.classList.add('correct');
+            document.getElementById('feedback').innerText = 'Jawaban Benar! 🎉';
+            score += (100 / currentQuestions.length);
+            playMp3Random(audioBenar);
+        } else {
+            selectedBtn.classList.add('wrong');
+            document.getElementById('feedback').innerText = 'Jawaban Salah! ❌';
+            buttons.forEach(btn => { if (btn.innerText === correctAnswer) btn.classList.add('correct'); });
+            playMp3Random(audioSalah);
+        }
+        document.getElementById('next-btn').style.display = 'block';
+    }
+
+    function nextQuestion() {
+        currentQuestionIndex++;
+        if (currentQuestionIndex < currentQuestions.length) {
+            loadQuestion();
+        } else {
+            showResult();
+        }
+    }
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            const nextBtn = document.getElementById('next-btn');
+            if (nextBtn && nextBtn.style.display === 'block') {
+                nextQuestion();
+            }
+        }
+    });
+
+    function showResult() {
+        document.getElementById('quiz-container').style.display = 'none';
+        document.getElementById('result-container').style.display = 'block';
+        
+        const finalScore = Math.round(score);
+        document.getElementById('final-score-text').innerText = finalScore;
+        
+        if (finalScore > 80) {
+            playMp3Random(audioSkorTinggi);
+        } else if (finalScore < 60) {
+            playMp3Random(audioSkorRendah);
+        }
+        
+        const tbody = document.getElementById('rekap-body');
+        tbody.innerHTML = '';
+        rekapJawaban.forEach((item, index) => {
+            const rowClass = item.status === 'Benar' ? 'row-correct' : 'row-wrong';
+            tbody.innerHTML += `<tr class="${rowClass}"><td>${index + 1}</td><td>${item.pertanyaan}</td><td>${item.jawabanUser}</td><td>${item.kunciJawaban}</td><td><strong>${item.status}</strong></td></tr>`;
+        });
+    }
+
+    function sendDataToServer() {
+        const btnSubmit = document.getElementById('submit-server-btn');
+        document.getElementById('server-status').innerText = "Mengirim data... (Tunggu sebentar)";
+        document.getElementById('server-status').style.color = "#333";
+        btnSubmit.disabled = true;
+
+        document.getElementById('server-form').action = SERVER_URL;
+        document.getElementById('f-waktu').value = new Date().toLocaleString();
+        document.getElementById('f-nama').value = userData.nama;
+        document.getElementById('f-email').value = userData.email;
+        document.getElementById('f-kelas').value = userData.kelas;
+        document.getElementById('f-skor').value = Math.round(score);
+
+        submitted = true;
+        document.getElementById('server-form').submit();
+    }
+</script>
+
+</body>
+</html>
